@@ -2281,8 +2281,10 @@ void CommandTable::AddCommandsV6()
 	ADD_CMD_RET(GetPressedKeys, kRetnType_Array);
 	ADD_CMD_RET(GetStringVariable, kRetnType_String);
 	ADD_CMD(SetStringVariable);
-
 	ADD_CMD(ar_Cat);
+	ADD_CMD(Jmp_If_True);
+	ADD_CMD(Jmp_If_False);
+	ADD_CMD(Jmp);
 }
 
 namespace PluginAPI

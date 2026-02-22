@@ -20,6 +20,7 @@
 #include "FunctionScripts.h"
 #include <fstream>
 #include "CachedScripts.h"
+#include "Commands_Scripting.h"
 //#include "ModTable.h"
 
 enum EScriptMode
@@ -1882,6 +1883,80 @@ bool Cmd_MatchesAnyOf_Execute(COMMAND_ARGS)
 				return true;
 			}
 		}
+	}
+	return true;
+}
+
+
+void ScriptJMP(UInt32* opcodeOffsetPtr, const UInt32 start, SInt32 const offset) {
+	const auto calculatedOpLength = GetCalculatedOpLength(opcodeOffsetPtr);
+	*calculatedOpLength = offset - static_cast<SInt32>(start);
+}
+
+bool Cmd_Jmp_If_True_Execute(
+	ParamInfo* paramInfo, 
+	void* scriptData, 
+	TESObjectREFR* thisObj, 
+	TESObjectREFR* containingObj, 
+	Script* scriptObj, 
+	ScriptEventList* eventList, 
+	double* result, 
+	UInt32* opcodeOffsetPtr
+) {
+	*result = 0;
+	ExpressionEvaluator eval(PASS_COMMAND_ARGS);
+
+	const auto start = *opcodeOffsetPtr;
+
+	if (eval.ExtractArgs() && eval.Arg(0)->GetBool()) {
+		ScriptJMP(opcodeOffsetPtr, start, static_cast<SInt32>(eval.Arg(1)->GetNumber()));
+		*result = 1;
+	}
+
+	return true;
+}
+
+bool Cmd_Jmp_If_False_Execute(
+	ParamInfo* paramInfo,
+	void* scriptData,
+	TESObjectREFR* thisObj,
+	TESObjectREFR* containingObj,
+	Script* scriptObj,
+	ScriptEventList* eventList,
+	double* result,
+	UInt32* opcodeOffsetPtr
+) {
+	*result = 0;
+	ExpressionEvaluator eval(PASS_COMMAND_ARGS);
+
+	const auto start = *opcodeOffsetPtr;
+
+	if (eval.ExtractArgs() && !eval.Arg(0)->GetBool()) {
+		ScriptJMP(opcodeOffsetPtr, start, static_cast<SInt32>(eval.Arg(1)->GetNumber()));
+		*result = 1;
+	}
+
+	return true;
+}
+
+bool Cmd_Jmp_Execute(
+	ParamInfo* paramInfo,
+	void* scriptData,
+	TESObjectREFR* thisObj,
+	TESObjectREFR* containingObj,
+	Script* scriptObj,
+	ScriptEventList* eventList,
+	double* result,
+	UInt32* opcodeOffsetPtr
+) {
+	const auto start = *opcodeOffsetPtr;
+
+	*result = 0;
+	ExpressionEvaluator eval(PASS_COMMAND_ARGS);
+
+	if (eval.ExtractArgs()) {
+		ScriptJMP(opcodeOffsetPtr, start, static_cast<SInt32>(eval.Arg(0)->GetNumber()));
+		*result = 1;
 	}
 	return true;
 }

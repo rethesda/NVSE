@@ -36,11 +36,14 @@ namespace Compiler::Passes {
 
 		std::stack<CallBuffer> callBuffers{};
 
-		std::stack<bool> insideNvseExpr{};
+		// Loop info
+		struct {
+			std::stack<bool> insideEnhancedLoop{};
+			std::stack<uint32_t> continueStack{};
+			std::stack<std::vector<uint32_t>> loopEndStack{};
+		} loopInfo;
 
-		// When we enter a for loop, push the increment condition on the stack
-		// Insert this before any continue / break
-		std::stack<StmtPtr> loopIncrements{};
+		std::stack<bool> insideNvseExpr{};
 
 		// Count number of statements compiled
 		// Certain blocks such as 'if' need to know how many ops to skip
@@ -249,6 +252,9 @@ namespace Compiler::Passes {
 		void AddCallArg(ExprPtr arg);
 		void StartManualArg();
 		void FinishManualArg();
+
+		size_t CreateJMP();
+		size_t CreateJNE(const ExprPtr& expr);
 	};
 
 }

@@ -710,7 +710,7 @@ namespace Compiler {
 			}
 			else {
 				left = LogicalOr();
-				Expect(TokenType::Slice, "Expected ':'.");
+				Expect(TokenType::Slice);
 			}
 
 			auto right = LogicalOr();
@@ -797,6 +797,7 @@ namespace Compiler {
 		ExprPtr left = BitwiseOr();
 
 		bool isNot = Match(TokenType::Not);
+
 		if (Match(TokenType::In)) {
 			const auto op = previousToken;
 
@@ -804,7 +805,7 @@ namespace Compiler {
 				vector<ExprPtr> values{};
 				while (!Match(TokenType::RightBracket)) {
 					if (!values.empty()) {
-						Expect(TokenType::Comma, "Expected ','.");
+						Expect(TokenType::Comma);
 					}
 					values.emplace_back(Expression());
 				}

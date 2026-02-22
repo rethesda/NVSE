@@ -1,6 +1,7 @@
 #include "Compiler.h"
 
 #include <assert.h>
+#include <sstream>
 
 #include "nvse/Commands_Array.h"
 #include "nvse/Commands_MiscRef.h"
@@ -33,7 +34,7 @@ namespace Compiler::Passes {
         OP_AR_BAD_NUMERIC_INDEX = 0x155F,
         OP_CONTINUE = 0x153E,
         OP_BREAK = 0x153F,
-        OP_VERSION = 0x1676,
+        OP_VERSION = 0x1676
     };
 
     void Compiler::PrintScriptInfo() {
@@ -63,10 +64,19 @@ namespace Compiler::Passes {
         // Script data  
         DbgPrintln("[Data]");
         DbgIndent();
+        std::stringstream ss{};
         for (int i = 0; i < engineScript->info.dataLength; i++) {
-            DbgPrint("%02X ", engineScript->data[i]);
+            if (i != 0 && i % 16 == 0) {
+                DbgPrintln(ss.str().c_str());
+                ss = {};
+            }
+            ss << std::format("{:02X}", engineScript->data[i]) << " ";
         }
-        DbgPrint("\n");
+
+        const auto rem = ss.str();
+        if (!rem.empty()) {
+            DbgPrintln(rem.c_str());
+        }
         DbgOutdent();
 
         InfoPrintln("[Requirements]");
@@ -89,7 +99,6 @@ namespace Compiler::Passes {
         DbgIndent();
 
         insideNvseExpr.push(false);
-        loopIncrements.push(nullptr);
         statementCounter.push(0);
         scriptStart.push(0);
 
@@ -392,9 +401,9 @@ namespace Compiler::Passes {
 
             insideNvseExpr.pop();
 
-            loopIncrements.push(nullptr);
+            loopInfo.insideEnhancedLoop.push(false);
             CompileBlock(stmt->block, true);
-            loopIncrements.pop();
+            loopInfo.insideEnhancedLoop.pop();
 
             // OP_LOOP
             AddU16(OP_LOOP);
@@ -442,9 +451,9 @@ namespace Compiler::Passes {
             SetU16(argPatch, data.size() - argStart);
             SetU16(exprPatch, data.size() - exprStart);
 
-            loopIncrements.push(nullptr);
+            loopInfo.insideEnhancedLoop.push(false);
             CompileBlock(stmt->block, true);
-            loopIncrements.pop();
+            loopInfo.insideEnhancedLoop.pop();
 
             // OP_LOOP
             AddU16(OP_LOOP);
@@ -457,57 +466,18 @@ namespace Compiler::Passes {
     }
 
     void Compiler::VisitIfStmt(Statements::If* stmt) {
-        // OP_IF
-        AddU16(static_cast<uint16_t>(ScriptParsing::ScriptStatementCode::If));
+        const auto jumpToElse = CreateJNE(stmt->cond);
+        stmt->block->Accept(this);
 
-        // Placeholder OP_LEN
-        auto exprPatch = AddU16(0x0);
-        auto exprStart = data.size();
+        // If there is an else block, the main block needs to jmp over it at the end
+        const auto jmpToEndOfElse = stmt->elseBlock ? CreateJMP() : 0;
 
-        // Placeholder JMP_OPS
-        auto jmpPatch = AddU16(0x0);
+        SetU32(jumpToElse, data.size() - scriptStart.top());
 
-        // Placeholder EXP_LEN
-        auto compPatch = AddU16(0x0);
-        auto compStart = data.size();
-
-        // OP_PUSH
-        AddU8(0x20);
-
-        // Enter NVSE eval
-        AddU8(0x58);
-        StartCall(OP_EVAL);
-        AddCallArg(stmt->cond);
-        FinishCall();
-
-        // Patch lengths
-        SetU16(compPatch, data.size() - compStart);
-        SetU16(exprPatch, data.size() - exprStart);
-
-        // Patch JMP_OPS
-        SetU16(jmpPatch, CompileBlock(stmt->block, true));
-
-        // Build OP_ELSE
         if (stmt->elseBlock) {
-            statementCounter.top()++;
-
-            // OP_ELSE
-            AddU16(static_cast<uint16_t>(ScriptParsing::ScriptStatementCode::Else));
-
-            // OP_LEN
-            AddU16(0x02);
-
-            // Placeholder JMP_OPS
-            auto elsePatch = AddU16(0x0);
-
-            // Compile else block
-            SetU16(elsePatch, CompileBlock(stmt->elseBlock, true));
+            stmt->elseBlock->Accept(this);
+            SetU32(jmpToEndOfElse, data.size() - scriptStart.top());
         }
-
-        // OP_ENDIF
-        statementCounter.top()++;
-        AddU16(static_cast<uint16_t>(ScriptParsing::ScriptStatementCode::EndIf));
-        AddU16(0x0);
     }
 
     void Compiler::VisitReturnStmt(Statements::Return* stmt) {
@@ -523,54 +493,48 @@ namespace Compiler::Passes {
     }
 
     void Compiler::VisitContinueStmt(Statements::Continue* stmt) {
-        if (loopIncrements.top()) {
-            loopIncrements.top()->Accept(this);
-            statementCounter.top()++;
+        if (loopInfo.insideEnhancedLoop.top()) {
+            statementCounter.top()--;
+            SetU32(CreateJMP(), loopInfo.continueStack.top());
+        } else {
+            AddU32(OP_CONTINUE);
         }
-
-        AddU32(OP_CONTINUE);
     }
 
     void Compiler::VisitBreakStmt(Statements::Break* stmt) {
-        AddU32(OP_BREAK);
+        if (loopInfo.insideEnhancedLoop.top()) {
+            statementCounter.top()--;
+            loopInfo.loopEndStack.top().emplace_back(CreateJMP());
+        } else {
+            AddU32(OP_BREAK);
+        }
     }
 
     void Compiler::VisitWhileStmt(Statements::While* stmt) {
-        // OP_WHILE
-        AddU16(OP_WHILE);
+        statementCounter.top()--;
+        const auto loopStart = data.size() - scriptStart.top();
+        const auto loopEndPatch = CreateJNE(stmt->cond);
 
-        // Placeholder OP_LEN
-        const auto exprPatch = AddU16(0x0);
-        const auto exprStart = data.size();
+        loopInfo.insideEnhancedLoop.push(true);
+        loopInfo.continueStack.push(loopStart);
+        loopInfo.loopEndStack.emplace();
 
-        const auto jmpPatch = AddU32(0x0);
+        // Compile block and jump to start after
+        stmt->block->Accept(this);
+        SetU32(CreateJMP(), loopStart);
 
-        // 1 param
-        AddU8(0x1);
+        // Patch jump to loop end
+        const auto loopEndPos = data.size() - scriptStart.top();
+        SetU32(loopEndPatch, loopEndPos);
 
-        // Compile / patch condition
-        auto condStart = data.size();
-        auto condPatch = AddU16(0x0);
-        insideNvseExpr.push(true);
-        stmt->cond->Accept(this);
-        insideNvseExpr.pop();
-        SetU16(condPatch, data.size() - condStart);
+        // Patch any break statements
+        for (const auto &off : loopInfo.loopEndStack.top()) {
+            SetU32(off, loopEndPos);
+        }
 
-        // Patch OP_LEN
-        SetU16(exprPatch, data.size() - exprStart);
-
-        // Compile block
-        loopIncrements.push(nullptr);
-        CompileBlock(stmt->block, true);
-        loopIncrements.pop();
-
-        // OP_LOOP
-        AddU16(OP_LOOP);
-        AddU16(0x0);
-        statementCounter.top()++;
-
-        // Patch jmp
-        SetU32(jmpPatch, data.size() - scriptStart.top());
+        loopInfo.loopEndStack.pop();
+        loopInfo.continueStack.pop();
+        loopInfo.insideEnhancedLoop.pop();
     }
 
     void Compiler::VisitBlockStmt(Statements::Block* stmt) {
@@ -1066,5 +1030,34 @@ namespace Compiler::Passes {
         insideNvseExpr.pop();
         SetU16(callBuffers.top().argPatch, data.size() - callBuffers.top().argStart);
         callBuffers.top().numArgs++;
+    }
+
+	size_t Compiler::CreateJMP() {
+        static uint16_t op_jmp = g_scriptCommands.GetByName("jmp")->opcode;
+
+        StartCall(op_jmp);
+        StartManualArg();
+        AddU8('L');
+        const auto off = AddU32(0);
+        FinishManualArg();
+        FinishCall();
+        statementCounter.top()++;
+
+        return off;
+    }
+
+	size_t Compiler::CreateJNE(const ExprPtr& expr) {
+        static uint16_t op_jmp = g_scriptCommands.GetByName("jmp_if_false")->opcode;
+
+        StartCall(op_jmp);
+        AddCallArg(expr);
+        StartManualArg();
+        AddU8('L');
+        const auto off = AddU32(0);
+        FinishManualArg();
+        FinishCall();
+        statementCounter.top()++;
+
+        return off;
     }
 }

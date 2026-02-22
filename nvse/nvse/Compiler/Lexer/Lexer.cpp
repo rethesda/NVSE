@@ -134,22 +134,21 @@ namespace Compiler {
 			if (pos >= input.size()) {
 				break;
 			}
+		}
 
-			if (pos < input.size() - 1) {
-				if (input[pos] == '/' && input[pos + 1] == '/') {
-					pos += 2;
-					column += 2; 
-					while (pos < input.size()) {
-						if (input[pos] == '\n') {
-							column = 1;
-							line++;
-							pos++;
-							break;
-						}
+		if (Match("//")) {
+			while (pos < input.size()) {
+				if (input[pos] == '\n') {
+					column = 1;
+					line++;
+					pos++;
+					return GetNextToken(useStack);
+				}
 
-						pos++;
-						column++;
-					}
+				pos++;
+
+				if (pos >= input.size()) {
+					break;
 				}
 			}
 		}

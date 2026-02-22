@@ -174,10 +174,10 @@ struct ParamInfo
 	DEFINE_CMD_FULL(name, altName, description, refRequired, numParams, paramInfo, Cmd_Default_Parse)	
 
 #define DEFINE_CMD_ALIAS(name, altName, description, refRequired, paramInfo) \
-	DEFINE_CMD_FULL(name, altName, description, refRequired, (paramInfo) ? (sizeof(paramInfo) / sizeof(ParamInfo)) : 0, paramInfo, Cmd_Default_Parse)	
+	DEFINE_CMD_FULL(name, altName, description, refRequired, (paramInfo) ? uint16_t{(sizeof(paramInfo) / sizeof(ParamInfo))} : uint16_t{0}, paramInfo, Cmd_Default_Parse)	
 
 #define DEFINE_CMD_ALT_EXP(name, altName, description, refRequired, paramInfo) \
-	DEFINE_CMD_FULL(name, altName, description, refRequired, (paramInfo) ? (sizeof(paramInfo) / sizeof(ParamInfo)) : 0, paramInfo, Cmd_Expression_Parse)	
+	DEFINE_CMD_FULL(name, altName, description, refRequired, (paramInfo) ? uint16_t{(sizeof(paramInfo) / sizeof(ParamInfo))} : uint16_t{0}, paramInfo, Cmd_Expression_Parse)	
 
 // Deprecated, use DEFINE_CMD instead.
 #define DEFINE_COMMAND(name, description, refRequired, numParams, paramInfo) \
