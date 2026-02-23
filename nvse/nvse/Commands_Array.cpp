@@ -1304,6 +1304,10 @@ bool Cmd_ar_Cat_Execute(COMMAND_ARGS) {
 		const auto arr2 = eval.Arg(1)->GetArrayVar();
 		const auto bOverwrite = eval.NumArgs() >= 3 && eval.Arg(2)->GetBool();
 
+		if (!arr1 || !arr2) {
+			return true;
+		}
+
 		if (arr1->GetContainerType() != arr2->GetContainerType()) {
 			return true;
 		}
