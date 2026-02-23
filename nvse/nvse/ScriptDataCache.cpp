@@ -590,8 +590,8 @@ namespace ScriptDataCache
             .entryCount = 0,
             .indexOffset = 0,
             .flags = 0,
-            .reserved = {},
-            .nvseVersion = PACKED_NVSE_VERSION
+            .nvseVersion = PACKED_NVSE_VERSION,
+            .reserved = {}
         };
         memset(header.reserved, 0, sizeof(header.reserved));
 
