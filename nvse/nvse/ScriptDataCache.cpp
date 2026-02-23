@@ -24,7 +24,8 @@ namespace ScriptDataCache
         UInt32 entryCount;
         UInt32 indexOffset;
         UInt32 flags;
-        UInt8 reserved[44];
+        UInt32 nvseVersion;
+        UInt8 reserved[40];
     };
     static_assert(sizeof(CacheHeader) == 64);
 
@@ -70,7 +71,7 @@ namespace ScriptDataCache
     namespace
     {
         constexpr UInt32 CACHE_MAGIC = 'NVSC';
-        constexpr UInt32 CACHE_VERSION = 3;
+        constexpr UInt32 CACHE_VERSION = 4;
         
         HANDLE g_hFile = INVALID_HANDLE_VALUE;
         HANDLE g_hMapping = nullptr;
@@ -392,24 +393,34 @@ namespace ScriptDataCache
 
                 ref->varIdx = serialized.varIdx;
 
-                ref->form = [&]() -> TESForm*
+            	auto formOpt = [&]() -> std::optional<TESForm*>
                 {
                     if (serialized.modNameIndex == 0xFFFF)
-                        return nullptr;
+                        return {nullptr};
 
                     if (serialized.modNameIndex == 0xFFFE)
-                        return LookupFormByID(serialized.baseFormID);
+                        return {LookupFormByID(serialized.baseFormID)};
 
                     if (serialized.modNameIndex >= modIndices.size())
-                        return nullptr;
+                        return {nullptr};
 
                     UInt8 currentModIndex = modIndices[serialized.modNameIndex];
                     if (currentModIndex == 0xFF)
-                        return nullptr;
+                        return {nullptr};
 
                     UInt32 reconstructedRefID = (static_cast<UInt32>(currentModIndex) << 24) | (serialized.baseFormID & 0x00FFFFFF);
-                    return LookupFormByID(reconstructedRefID);
+                    if (const auto pResolved = LookupFormByID(reconstructedRefID)) {
+                        return { pResolved };
+                    }
+
+                    return std::nullopt;
                 }();
+
+                if (!formOpt.has_value()) {
+                    return false;
+                }
+
+            	ref->form = *formOpt;
 
                 ReadNameString(ptr, serialized.nameLen, ref->name);
 
@@ -518,7 +529,11 @@ namespace ScriptDataCache
         }
 
         const auto* header = static_cast<const CacheHeader*>(g_basePtr);
-        if (header->magic != CACHE_MAGIC || header->version != CACHE_VERSION)
+        if (
+            header->magic != CACHE_MAGIC || 
+            header->version != CACHE_VERSION ||
+            header->nvseVersion != PACKED_NVSE_VERSION
+        )
         {
             CleanupMapping();
             return true;
@@ -575,7 +590,8 @@ namespace ScriptDataCache
             .entryCount = 0,
             .indexOffset = 0,
             .flags = 0,
-            .reserved = {}
+            .reserved = {},
+            .nvseVersion = PACKED_NVSE_VERSION
         };
         memset(header.reserved, 0, sizeof(header.reserved));
 
