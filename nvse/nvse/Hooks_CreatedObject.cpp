@@ -91,32 +91,6 @@ UInt32 FakeModInfo::SetStaticFieldsAndGetFormTypeEnum(UInt32 aChunkType) {
 	return 0;
 };
 
-void SaveCreatedObjects(NVSESerializationInterface* nvse)
-{
-	TESSaveLoadGame* game = TESSaveLoadGame::Get();
-	for (TESSaveLoadGame::CreatedObject* crobj = &game->createdObjectList; crobj; crobj = crobj->next)
-	{
-		if (crobj && crobj->refID)
-			if ((crobj->refID & 0xFF000000) == 0xFF000000)
-			{
-				TESForm* form = LookupFormByID(crobj->refID);
-				if (!form)
-				{
-					_MESSAGE("SAVE: Unkown Object %08x found in created base object list", crobj->refID);
-					continue;
-				}
-				else
-				{
-					form->SaveForm();
-					nvse->OpenRecord('CROB', 0);
-					nvse->WriteRecordData(*g_CreatedObjectData, *g_CreatedObjectSize);
-				}
-			}
-			else
-				_MESSAGE("Save: Non-created object or garbage refID %08x found in created base object list.", crobj->refID);
-	}
-}
-
 void fakeModInfo_GetNextChunk(void) {
 	FakeModInfo* fakeModInfo = FakeModInfo::Get();
 	ChunkHeader* current = (ChunkHeader*)((UInt32)(fakeModInfo->dataBuf)+fakeModInfo->dataOffset);
@@ -141,73 +115,3 @@ void __declspec( naked ) Hook_fakeModInfo_GetNextChunk(void) {
 		popa
 	}
 };
-
-bool LoadCreatedObject(NVSESerializationInterface* nvse)
-{
-	//stub
-	FakeModInfo* fakeModInfo = FakeModInfo::Get();
-	DataHandler* dataHandler =DataHandler::Get();
-
-	nvse->PeekRecordData(&(fakeModInfo->formInfo), sizeof(fakeModInfo->formInfo));
-	if (IsBigEndian()) {
-		MACRO_SWAP32(fakeModInfo->formInfo.recordType);
-		MACRO_SWAP32(fakeModInfo->formInfo.dataSize);
-		MACRO_SWAP32(fakeModInfo->formInfo.formFlags);
-		MACRO_SWAP32(fakeModInfo->formInfo.formID);
-		MACRO_SWAP32(fakeModInfo->formInfo.unk10);
-		MACRO_SWAP16(fakeModInfo->formInfo.formVersion);
-		MACRO_SWAP16(fakeModInfo->formInfo.unk16);
-	}
-	fakeModInfo->SetStaticFieldsAndGetFormTypeEnum(fakeModInfo->formInfo.recordType);
-
-	bool result = false;
-	UInt32 RecordSize = fakeModInfo->formInfo.dataSize + sizeof(fakeModInfo->formInfo);
-	void* formData = FormHeap_Allocate(RecordSize);
-	if (formData)
-		__try {
-			if (nvse->ReadRecordData(formData, RecordSize) == RecordSize)
-				__try {
-					fakeModInfo->dataBuf = (UInt8*)formData + sizeof(fakeModInfo->formInfo);
-					fakeModInfo->dataBufSize = fakeModInfo->formInfo.dataSize;
-					fakeModInfo->dataOffset = 0;
-					fakeModInfo->fileOffset = 0;
-					void** formDataAddr = &(fakeModInfo->dataBuf);
-					g_CreatedObjectSize = &(fakeModInfo->dataBufSize);
-					g_CreatedObjectData = (UInt8**)formDataAddr;
-
-					TESForm* form = CreateFormInstance(*s_ModInfo_CurrentFormTypeEnum);
-					if (!form) {
-						_MESSAGE("LOAD: Unkown Object type %08x found in created objects cosave", s_ModInfo_CurrentFormTypeEnum);
-					}
-					else {
-						UInt32 bWasCompressed = fakeModInfo->formInfo.formFlags & TESForm::kFormFlags_Compressed;
-						UInt8 bSaveUnk61A = dataHandler->unk61A & 1;
-						bool formReady = false;
-						__try {
-							dataHandler->unk61A |= 1;
-							fakeModInfo->formInfo.formFlags |= TESForm::kFormFlags_Compressed;	// avoids calling TESFile.read in GetNextChunk...
-							form->LoadForm(fakeModInfo);
-							form->InitItem();
-							formReady = true;
-						} __finally {
-							if (!bWasCompressed)
-								fakeModInfo->formInfo.formFlags &= !TESForm::kFormFlags_Compressed;	// restores
-							if (!bSaveUnk61A) 
-								dataHandler->unk61A &= 0xFFFFFFFE;
-						}
-						if (formReady)
-							form->DoAddForm(form, true, false);
-					}
-			} __finally {
-					fakeModInfo->dataBuf = NULL;
-					fakeModInfo->dataOffset = 0;
-					g_CreatedObjectSize = NULL;
-					g_CreatedObjectData = NULL;
-					result = true;
-			}
-		} __finally {
-			FormHeap_Free(formData);
-		}
-
-	return result;
-}

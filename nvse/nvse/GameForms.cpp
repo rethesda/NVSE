@@ -88,21 +88,7 @@ const char *TESForm::GetTheName()
 
 void TESForm::DoAddForm(TESForm *newForm, bool persist, bool record) const
 {
-	CALL_MEMBER_FN(DataHandler::Get(), DoAddForm)
-	(newForm);
-
-	if (persist)
-	{
-		// Only some forms can be safely saved as SaveForm. ie TESPackage at the moment.
-		bool canSave = false;
-		TESPackage *package = DYNAMIC_CAST(newForm, TESForm, TESPackage);
-		if (package)
-			canSave = true;
-		// ... more ?
-		if (canSave)
-			CALL_MEMBER_FN(TESSaveLoadGame::Get(), AddCreatedForm)
-			(newForm);
-	}
+	CALL_MEMBER_FN(DataHandler::Get(), DoAddForm)(newForm);
 }
 
 TESForm *TESForm::CloneForm(bool persist) const

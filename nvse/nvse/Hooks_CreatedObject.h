@@ -27,9 +27,6 @@ struct FakeModInfo : public ModInfo
 
 void Hook_CreatedObjects_Init();
 
-bool LoadCreatedObject(NVSESerializationInterface* nvse);
-void SaveCreatedObjects(NVSESerializationInterface* nvse);
-
 /*********************************
 
 LoadForm routines

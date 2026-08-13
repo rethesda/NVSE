@@ -1894,8 +1894,6 @@ bool Cmd_PlaceAtMeAndKeep_Execute(COMMAND_ARGS)
 		return false;
 	if (*result)
 		form = LookupFormByID(*refResult);
-	if (form)
-		CALL_MEMBER_FN(TESSaveLoadGame::Get(), AddCreatedForm)((TESForm*)(form));
 
 	return true;
 }

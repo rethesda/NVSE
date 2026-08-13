@@ -694,9 +694,6 @@ public:
 	static TESSaveLoadGame *Get();
 
 	MEMBER_FN_PREFIX(TESSaveLoadGame);
-#if RUNTIME
-	DEFINE_MEMBER_FN(AddCreatedForm, UInt32, 0x00861780, TESForm *pForm);
-#endif
 };
 
 #if RUNTIME
