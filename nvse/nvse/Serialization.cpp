@@ -707,7 +707,7 @@ void HandleSaveGame(const char * path)
 
 				if(!s_pluginHeader.opcodeBase)
 				{
-					_ERROR("HandleSaveGame: plugin with default opcode base registered for serialization");
+					_ERROR("HandleSaveGame: plugin %s has the default opcode base registered for serialization", g_pluginManager.GetPluginNameFromHandle(s_currentPlugin));
 					continue;
 				}
 
@@ -847,24 +847,31 @@ void HandleLoadGame(const char * path, NVSESerializationInterface::EventCallback
 			}
 
 			UInt32 pluginChunkStart = s_serializationTask.GetOffset();
-
+			s_currentPlugin = -1;
 			// find the corresponding plugin
 			UInt32 pluginIdx = (s_pluginHeader.opcodeBase == kNvseOpcodeBase) ? 0 : g_pluginManager.LookupHandleFromBaseOpcode(s_pluginHeader.opcodeBase);
 			if (pluginIdx != kPluginHandle_Invalid)
 			{
+				s_currentPlugin = pluginIdx;
 				s_pluginCallbacks[pluginIdx].hadData = true;
 
 				if (s_pluginCallbacks[pluginIdx].*callback)
 				{
+#if _DEBUG
+					_MESSAGE("reading data for plugin %s at %08X", g_pluginManager.GetPluginNameFromHandle(s_currentPlugin), pluginChunkStart);
+#endif
 					s_chunkOpen = false;
 					curCallback = s_pluginCallbacks[pluginIdx].*callback;
 					curCallback((void*)path);
 				}
 				else
 				{
-					// ### wtf?
-					_WARNING("plugin has data in save file but no handler");
-
+					// filter out preload callback, as it's not necessary to have
+					// but if both load callbacks are missing... then something is wrong
+					if (!s_preloading && !s_pluginCallbacks[pluginIdx].preLoad) {
+						// ### wtf?
+						_WARNING("plugin %s has data in save file but no handlers", g_pluginManager.GetPluginNameFromHandle(s_currentPlugin));
+					}
 					s_serializationTask.Skip(s_pluginHeader.length, true);
 				}
 			}
@@ -879,7 +886,7 @@ void HandleLoadGame(const char * path, NVSESerializationInterface::EventCallback
 			UInt32 expectedOffset = pluginChunkStart + s_pluginHeader.length;
 			if (s_serializationTask.GetOffset() != expectedOffset)
 			{
-				_WARNING("plugin did not read all of its data (at %016I64X expected %016I64X)", s_serializationTask.GetOffset(), expectedOffset);
+				_WARNING("plugin %s did not read all of its data (at %08X expected %08X)", g_pluginManager.GetPluginNameFromHandle(s_currentPlugin), s_serializationTask.GetOffset(), expectedOffset);
 				s_serializationTask.SetOffset(expectedOffset);
 			}
 		}
