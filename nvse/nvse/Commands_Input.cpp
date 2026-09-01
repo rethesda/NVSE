@@ -439,14 +439,15 @@ bool Cmd_IsControlPressed_Eval(COMMAND_ARGS_EVAL)
 	*result = 0;
 
 	UInt32 ctrl = (UInt32)arg1;
+	UInt32 flags = (UInt32)arg2;
 	UInt32 keycode = GetControl(ctrl, OSInputGlobals::kControlType_Keyboard);
 
-	if(keycode != 0xFF && DIHookControl::GetSingleton().IsKeyPressed(keycode))
+	if(keycode != 0xFF && DIHookControl::GetSingleton().IsKeyPressed(keycode, flags))
 		*result = 1;
 	else
 	{
 		keycode = GetControl(ctrl, OSInputGlobals::kControlType_Mouse);
-		if(keycode != 0xFF && DIHookControl::GetSingleton().IsKeyPressed(keycode))
+		if(keycode != 0xFF && DIHookControl::GetSingleton().IsKeyPressed(keycode, flags))
 			*result = 1;
 	}
 
@@ -456,10 +457,10 @@ bool Cmd_IsControlPressed_Eval(COMMAND_ARGS_EVAL)
 bool Cmd_IsControlPressed_Execute(COMMAND_ARGS)
 {
 	*result = 0;
-	UInt32 ctrl, flags = 1;
+	UInt32 ctrl, flags = 0;
 
 	if (ExtractArgs(EXTRACT_ARGS, &ctrl, &flags))
-		return Cmd_IsControlPressed_Eval(thisObj, (void*)ctrl, 0, result);
+		return Cmd_IsControlPressed_Eval(thisObj, (void*)ctrl, (void*)flags, result);
 
 	return true;
 }
