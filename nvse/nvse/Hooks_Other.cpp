@@ -519,13 +519,14 @@ namespace OtherHooks
 	namespace CellLoading {
 		class NVSECellLoadData : public FormExtraData {
 		public:
-			NVSECellLoadData() noexcept : FormExtraData(GetName()) {}
+			NVSECellLoadData() noexcept : FormExtraData() {}
 			virtual ~NVSECellLoadData() override = default;
+			virtual const NiFixedString& GetName() const final { return GetDataName(); }
 
 			bool	bAllRefsLoaded = false;
 			UInt16	usReferenceCount = 0;
 
-			static const NiFixedString& GetName() noexcept {
+			static const NiFixedString& GetDataName() noexcept {
 				static NiFixedString name = "NVSECellLoadedData";
 				return name;
 			}
@@ -536,7 +537,7 @@ namespace OtherHooks
 				return item;
 			}
 			static NVSECellLoadData* Get(TESObjectCELL* apCell) noexcept {
-				if (auto* existing = FormExtraData::Get(apCell, GetName()))
+				if (auto* existing = FormExtraData::Get(apCell, GetDataName()))
 					return static_cast<NVSECellLoadData*>(existing);
 				auto* data = Create();
 				FormExtraData::Add(apCell, data);

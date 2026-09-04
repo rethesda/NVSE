@@ -516,7 +516,11 @@ public:
 
 	static GlobalStringHandle AddString(const char* pcString)
 	{
+#if RUNTIME
 		return CdeclCall<GlobalStringHandle>(0xA5B690, pcString);
+#else
+		return CdeclCall<GlobalStringHandle>(0x81B0C0, pcString);
+#endif
 	}
 
 	static char* GetRealBufferStart(const GlobalStringHandle& arHandle)

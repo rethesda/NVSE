@@ -48,10 +48,11 @@ class ScriptTokenCacheFormExtraData : public FormExtraData
 public:
 	ScriptTokenCacheFormExtraData();
 	virtual ~ScriptTokenCacheFormExtraData() override = default;
+	virtual const NiFixedString& GetName() const final;
 
 	TokenCache cache;
 
 	static ScriptTokenCacheFormExtraData* Create();
 	static ScriptTokenCacheFormExtraData* Get(Script* script);
-	static const NiFixedString& GetName();
+	static const NiFixedString& GetDataName() noexcept;
 };

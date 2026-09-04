@@ -167,6 +167,8 @@ void NVSE_Initialize(void)
 #endif
 		CommandTable::Init();
 
+		FormExtraDataManager::WriteHooks();
+
 #if RUNTIME
 		Commands_Input_Init();
 		Hook_DirectInput8Create_Init();
@@ -177,7 +179,6 @@ void NVSE_Initialize(void)
 		Hook_Script_Init();
 		Hook_Animation_Init();
 		OtherHooks::Hooks_Other_Init();
-		FormExtraData::WriteHooks();
 
 		Hook_Dialog_Init();
 		PatchGameCommandParser();
